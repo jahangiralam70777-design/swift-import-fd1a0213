@@ -62,13 +62,29 @@ export const listModuleVisibility = createServerFn({ method: "GET" }).handler(as
   const { supabase } = await import("@/integrations/supabase/client");
   const [{ data, error }, flash, notes, qbank, classes] = await Promise.all([
     supabase
-    .from("module_visibility")
-    .select("key,label,hidden,updated_at")
+      .from("module_visibility")
+      .select("key,label,hidden,updated_at")
       .order("label"),
-    supabase.from("flash_card_visibility").select("section_hidden,updated_at").eq("id", 1).maybeSingle(),
-    supabase.from("short_notes_visibility").select("section_hidden,updated_at").eq("id", 1).maybeSingle(),
-    supabase.from("question_bank_visibility").select("section_hidden,updated_at").eq("id", 1).maybeSingle(),
-    supabase.from("video_class_visibility").select("section_hidden,updated_at").eq("id", 1).maybeSingle(),
+    supabase
+      .from("flash_card_visibility")
+      .select("section_hidden,updated_at")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase
+      .from("short_notes_visibility")
+      .select("section_hidden,updated_at")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase
+      .from("question_bank_visibility")
+      .select("section_hidden,updated_at")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase
+      .from("video_class_visibility")
+      .select("section_hidden,updated_at")
+      .eq("id", 1)
+      .maybeSingle(),
   ]);
   if (error) throw error;
   const sectionHidden: Partial<Record<ModuleKey, { hidden: boolean; updated_at?: string }>> = {
