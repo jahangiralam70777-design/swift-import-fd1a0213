@@ -21,6 +21,16 @@ export type ModuleVisibilityRow = {
   updated_at: string;
 };
 
+const MODULE_LABELS: Record<ModuleKey, string> = {
+  mcq_practice: "MCQ Practice",
+  quiz: "Quiz",
+  mock_test: "Mock Test",
+  flash_cards: "Flash Cards",
+  short_notes: "Short Notes",
+  qns_bank: "Qns Bank",
+  classes: "Classes",
+};
+
 const MANAGER_VISIBILITY_TABLE_BY_MODULE: Partial<Record<ModuleKey, string>> = {
   flash_cards: "flash_card_visibility",
   short_notes: "short_notes_visibility",
@@ -52,8 +62,7 @@ export async function syncModuleHiddenFlag(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from("module_visibility")
-    .update({ hidden, updated_at: updatedAt })
-    .eq("key", key);
+    .upsert({ key, label: MODULE_LABELS[key], hidden, updated_at: updatedAt });
   if (error) throw error;
 }
 
