@@ -1019,7 +1019,7 @@ function ResultStage({
               )}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {mock.title} · {mock.subjects?.name ?? "General"}
+              {stripAutoTitle(mock.title)} · {mock.subjects?.name ?? "General"}
             </p>
 
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
