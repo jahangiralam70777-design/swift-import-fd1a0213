@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useModuleVisibility, type ModuleKey } from "@/hooks/use-module-visibility";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Wraps a student page and redirects to /dashboard when the corresponding
- * module is hidden by an admin. While the visibility query is loading, the
- * children render normally (optimistic) to avoid a flash for fast paths.
+ * module is hidden by an admin. While visibility loads, keep content hidden
+ * so direct URL access never flashes a disabled feature.
  */
 export function HiddenModuleGuard({
   moduleKey,
@@ -21,6 +22,10 @@ export function HiddenModuleGuard({
   useEffect(() => {
     if (hidden) navigate({ to: "/dashboard", replace: true });
   }, [hidden, navigate]);
+
+  if (isLoading) {
+    return <Skeleton className="h-[60vh] w-full rounded-3xl" />;
+  }
 
   if (hidden) {
     return (

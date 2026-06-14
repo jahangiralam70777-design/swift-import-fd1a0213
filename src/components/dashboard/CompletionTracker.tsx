@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { studentCompletionTracker } from "@/lib/student-performance.functions";
 import { useRealtimeActivity } from "@/hooks/use-realtime-invalidator";
+import { useModuleVisibility } from "@/hooks/use-module-visibility";
 
 function Ring({
   pct,
@@ -68,6 +69,8 @@ export function CompletionTracker() {
   const fetchFn = useServerFn(studentCompletionTracker);
   const qc = useQueryClient();
   const activity = useRealtimeActivity();
+  const { isPathHidden } = useModuleVisibility();
+  const flashCardsHidden = isPathHidden("/flash-cards");
 
   const { data, isLoading } = useQuery({
     queryKey: ["student-completion-tracker"],
@@ -275,12 +278,14 @@ export function CompletionTracker() {
                     >
                       Practice <ArrowRight className="h-3 w-3" />
                     </Link>
-                    <Link
-                      to="/flash-cards"
-                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-background/60 px-2 py-1 text-[10px] font-bold hover:bg-background/80"
-                    >
-                      Revise
-                    </Link>
+                    {!flashCardsHidden && (
+                      <Link
+                        to="/flash-cards"
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-background/60 px-2 py-1 text-[10px] font-bold hover:bg-background/80"
+                      >
+                        Revise
+                      </Link>
+                    )}
                   </div>
                 </li>
               ))
