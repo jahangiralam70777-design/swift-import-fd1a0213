@@ -563,7 +563,7 @@ export function QuizFlow() {
                     >
                       <div className="min-w-0">
                         <p className="truncate font-medium">
-                          {(a.quiz_id && quizTitleById.get(a.quiz_id)) || "Quiz attempt"}
+                          {(a.quiz_id && stripAutoTitle(quizTitleById.get(a.quiz_id))) || "Quiz attempt"}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           {new Date(a.completed_at ?? a.started_at).toLocaleString()} ·{" "}
