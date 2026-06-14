@@ -598,7 +598,7 @@ export function QuizFlow() {
                   <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                     {level?.t}
                   </p>
-                  <h3 className="font-display text-lg font-bold">{meta?.title ?? "Loading…"}</h3>
+                  <h3 className="font-display text-lg font-bold">{stripAutoTitle(meta?.title) || "Loading…"}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <div
