@@ -439,7 +439,7 @@ function MockCard({ mock, delay, onStart }: { mock: MockRow; delay: number; onSt
         </div>
 
         <h3 className="font-display mt-3 line-clamp-2 text-lg font-bold tracking-tight">
-          {mock.title}
+          {stripAutoTitle(mock.title)}
         </h3>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded-full bg-muted/60 px-2 py-0.5">{subjectName}</span>
