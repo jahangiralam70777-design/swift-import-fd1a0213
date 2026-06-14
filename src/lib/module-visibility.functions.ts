@@ -60,10 +60,19 @@ export async function syncModuleHiddenFlag(
   updatedAt = new Date().toISOString(),
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from("module_visibility")
-    .upsert({ key, label: MODULE_LABELS[key], hidden, updated_at: updatedAt });
+    .update({ hidden, updated_at: updatedAt })
+    .eq("key", key)
+    .select("key")
+    .maybeSingle();
   if (error) throw error;
+  if (data) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertError } = await (supabase as any)
+    .from("module_visibility")
+    .insert({ key, label: MODULE_LABELS[key], hidden, updated_at: updatedAt });
+  if (insertError) throw insertError;
 }
 
 export const listModuleVisibility = createServerFn({ method: "GET" }).handler(async () => {
