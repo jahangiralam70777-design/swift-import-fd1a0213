@@ -742,7 +742,7 @@ function ExamStage({
             <Trophy className="h-5 w-5" />
           </div>
           <div>
-            <div className="font-display text-sm font-bold">{mock.title}</div>
+            <div className="font-display text-sm font-bold">{stripAutoTitle(mock.title)}</div>
             <div className="text-xs text-muted-foreground">
               {mock.subjects?.name ?? "General"} · {cap(mock.level)}
             </div>
