@@ -58,6 +58,7 @@ import {
 import { useRealtimeActivity } from "@/hooks/use-realtime-invalidator";
 import { useAppStore } from "@/stores/app-store";
 import { CountUp } from "@/components/realtime/CountUp";
+import { useModuleVisibility } from "@/hooks/use-module-visibility";
 
 type RangeKey = "today" | "week" | "month" | "30d";
 const RANGE_LABEL: Record<RangeKey, string> = {
@@ -374,6 +375,8 @@ export function DailyProgressCenter() {
   const saveGoalsFn = useServerFn(setUserGoals);
   const qc = useQueryClient();
   const activity = useRealtimeActivity();
+  const { isPathHidden } = useModuleVisibility();
+  const qnsBankHidden = isPathHidden("/qns-bank");
   const user = useAppStore((s) => s.user);
   const uid = user?.id ?? "anon";
   const [editing, setEditing] = useState<null | "daily" | "weekly" | "monthly">(null);
@@ -732,12 +735,14 @@ export function DailyProgressCenter() {
         <div className="glass shadow-card-soft rounded-3xl p-5 lg:col-span-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Subject Breakdown</h3>
-            <Link
-              to="/qns-bank"
-              className="text-[11px] font-semibold text-[var(--neon-blue)] hover:underline"
-            >
-              View All
-            </Link>
+            {!qnsBankHidden && (
+              <Link
+                to="/qns-bank"
+                className="text-[11px] font-semibold text-[var(--neon-blue)] hover:underline"
+              >
+                View All
+              </Link>
+            )}
           </div>
           {subjBreakdown.length === 0 ? (
             <EmptyMini text="Start practicing to see your subject performance." />

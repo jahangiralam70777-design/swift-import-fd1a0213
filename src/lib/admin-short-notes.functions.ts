@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertPermission } from "@/lib/admin-permissions";
 import { sanitizeSearchTerm } from "@/lib/admin-search-sanitize";
+import { syncModuleHiddenFlag } from "@/lib/module-visibility.functions";
 
 import { noInput } from "@/lib/validate";
 const statusEnum = z.enum(["draft", "published", "archived"]);
@@ -102,10 +103,12 @@ export const adminSetShortNotesVisibility = createServerFn({ method: "POST" })
   .inputValidator((i: z.infer<typeof visInput>) => visInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertPermission(context.supabase, context.userId, "manage_content");
+    const updatedAt = new Date().toISOString();
     const { error } = await context.supabase
       .from("short_notes_visibility")
-      .upsert({ id: 1, ...data, updated_at: new Date().toISOString() });
+      .upsert({ id: 1, ...data, updated_at: updatedAt });
     if (error) throw error;
+    await syncModuleHiddenFlag(context.supabase, "short_notes", data.section_hidden, updatedAt);
     return { ok: true };
   });
 

@@ -1245,6 +1245,7 @@ function VisibilityPanel({
         () => {
           qc.invalidateQueries({ queryKey: ["flash-card-visibility"] });
           qc.invalidateQueries({ queryKey: ["public-flash-cards"] });
+          qc.invalidateQueries({ queryKey: ["module-visibility"] });
         },
       )
       .subscribe();
@@ -1280,6 +1281,7 @@ function VisibilityPanel({
       toast.success("Visibility updated — students sync instantly");
       qc.invalidateQueries({ queryKey: ["flash-card-visibility"] });
       qc.invalidateQueries({ queryKey: ["public-flash-cards"] });
+      qc.invalidateQueries({ queryKey: ["module-visibility"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

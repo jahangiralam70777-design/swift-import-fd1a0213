@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useModuleVisibility } from "@/hooks/use-module-visibility";
 import {
   Bell,
   Megaphone,
@@ -104,7 +105,13 @@ function inferRoute(n: MyNotification): string | null {
   return null;
 }
 
+function normaliseInternalPath(target: string | null) {
+  if (!target || /^https?:\/\//i.test(target)) return null;
+  return target.startsWith("/") ? target : `/${target}`;
+}
+
 export function NotificationsFlow() {
+  const { isPathHidden } = useModuleVisibility();
   const { items, unread, isLoading, markRead, markAll } = useMyNotifications();
   const navigate = useNavigate();
   const [tab, setTab] = useState<FilterKey>("All");
@@ -177,11 +184,13 @@ export function NotificationsFlow() {
     const link = (n.link ?? "").trim();
     const target = link || inferRoute(n);
     if (!target) return;
+    const internalPath = normaliseInternalPath(target);
+    if (internalPath && isPathHidden(internalPath)) return;
     if (/^https?:\/\//i.test(target)) {
       window.open(target, "_blank", "noopener");
       return;
     }
-    const path = target.startsWith("/") ? target : `/${target}`;
+    const path = internalPath ?? "/dashboard";
     setSelected(null);
     try {
       navigate({ to: path as never });
@@ -318,6 +327,11 @@ export function NotificationsFlow() {
       {selected && (
         <DetailModal
           n={selected}
+          canNavigate={
+            !isPathHidden(
+              normaliseInternalPath((selected.link ?? "").trim() || inferRoute(selected) || "") ?? "",
+            )
+          }
           onClose={() => setSelected(null)}
           onNavigate={() => navigateTo(selected)}
           onDismiss={() => dismiss(selected.id)}
@@ -437,11 +451,13 @@ function NotifCard({
 
 function DetailModal({
   n,
+  canNavigate,
   onClose,
   onNavigate,
   onDismiss,
 }: {
   n: MyNotification;
+  canNavigate: boolean;
   onClose: () => void;
   onNavigate: () => void;
   onDismiss: () => void;
@@ -459,7 +475,7 @@ function DetailModal({
   }, [onClose]);
 
   const Icon = TYPE_ICON[n.type] ?? Bell;
-  const hasTarget = !!(n.link?.trim() || inferRoute(n));
+  const hasTarget = canNavigate && !!(n.link?.trim() || inferRoute(n));
 
   return (
     <div

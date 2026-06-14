@@ -135,6 +135,7 @@ const TABLE_QUERY_KEYS: TableMap = {
   },
   short_notes_visibility: {
     keys: [
+      "module-visibility",
       "short-notes",
       "shortNotes",
       "public-short-notes",
@@ -158,6 +159,7 @@ const TABLE_QUERY_KEYS: TableMap = {
   },
   flash_card_visibility: {
     keys: [
+      "module-visibility",
       "flash-cards",
       "flashCards",
       "public-flash-cards",
@@ -182,6 +184,7 @@ const TABLE_QUERY_KEYS: TableMap = {
   },
   video_class_visibility: {
     keys: [
+      "module-visibility",
       "video-classes",
       "classes",
       "videoClasses",
@@ -209,6 +212,7 @@ const TABLE_QUERY_KEYS: TableMap = {
   },
   question_bank_visibility: {
     keys: [
+      "module-visibility",
       "question-bank",
       "qns-bank",
       "questionBank",

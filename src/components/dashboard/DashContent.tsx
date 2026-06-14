@@ -75,6 +75,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 export function DashContent() {
   const { isPathHidden } = useModuleVisibility();
   const mockTestHidden = isPathHidden("/mock-test");
+  const shortNotesHidden = isPathHidden("/short-notes");
 
   const userName = useAppStore((s) => s.user?.name ?? "Learner");
 
@@ -157,7 +158,7 @@ export function DashContent() {
       l: "Quizzes",
       v: counts?.quizzes ?? 0,
       suffix: "",
-      d: `${counts?.notes ?? 0} notes ready`,
+      d: shortNotesHidden ? `+${counts?.quizzesThisWeek ?? 0} this week` : `${counts?.notes ?? 0} notes ready`,
       tone: "oklch(0.7 0.2 200)",
     },
   ];
