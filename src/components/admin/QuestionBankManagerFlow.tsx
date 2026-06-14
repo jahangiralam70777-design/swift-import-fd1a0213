@@ -1106,6 +1106,7 @@ function VisibilityPanel({
         () => {
           qc.invalidateQueries({ queryKey: ["qbank-visibility"] });
           qc.invalidateQueries({ queryKey: ["qbank-public"] });
+          qc.invalidateQueries({ queryKey: ["module-visibility"] });
         },
       )
       .subscribe();
@@ -1141,6 +1142,7 @@ function VisibilityPanel({
       toast.success("Visibility updated — students sync instantly");
       qc.invalidateQueries({ queryKey: ["qbank-visibility"] });
       qc.invalidateQueries({ queryKey: ["qbank-public"] });
+      qc.invalidateQueries({ queryKey: ["module-visibility"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

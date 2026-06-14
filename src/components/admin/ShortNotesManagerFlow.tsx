@@ -1044,6 +1044,7 @@ function VisibilityPanel({
         () => {
           qc.invalidateQueries({ queryKey: ["short-notes-visibility"] });
           qc.invalidateQueries({ queryKey: ["public-short-notes"] });
+          qc.invalidateQueries({ queryKey: ["module-visibility"] });
         },
       )
       .subscribe();
@@ -1079,6 +1080,7 @@ function VisibilityPanel({
       toast.success("Visibility updated — students sync instantly");
       qc.invalidateQueries({ queryKey: ["short-notes-visibility"] });
       qc.invalidateQueries({ queryKey: ["public-short-notes"] });
+      qc.invalidateQueries({ queryKey: ["module-visibility"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
