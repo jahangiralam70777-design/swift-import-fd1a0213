@@ -128,6 +128,12 @@ export const adminNavItems: NavItem[] = [
     icon: Activity,
     keywords: ["errors", "logs", "monitoring", "debug", "incidents", "health"],
   },
+  {
+    title: "Live Chat Manager",
+    to: "/admin/live-chat",
+    icon: MessageCircle,
+    keywords: ["chat", "support", "messages", "inbox", "live"],
+  },
   { title: "Settings", to: "/admin/settings", icon: Settings, keywords: ["save", "platform"] },
 ];
 
