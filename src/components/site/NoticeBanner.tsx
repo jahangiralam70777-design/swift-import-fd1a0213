@@ -34,31 +34,44 @@ export const NOTICE_BANNER_DEFAULTS: NoticeBannerValue = {
   endAt: null,
 };
 
-const TYPE_STYLES: Record<NoticeType, { bar: string; chip: string; icon: React.ComponentType<{ className?: string }> }> = {
+const TYPE_STYLES: Record<
+  NoticeType,
+  {
+    bar: string;
+    chip: string;
+    icon: React.ComponentType<{ className?: string }>;
+    glow: string;
+  }
+> = {
   info: {
-    bar: "border-sky-500/40 bg-sky-50 text-sky-950 dark:bg-sky-950/50 dark:text-sky-50",
-    chip: "bg-sky-500/15 text-sky-900 border-sky-500/40 dark:bg-sky-400/20 dark:text-sky-100",
+    bar: "border-l-[3px] border-sky-500 bg-gradient-to-r from-sky-50/90 to-sky-100/60 dark:from-sky-950/70 dark:to-sky-900/40 text-sky-900 dark:text-sky-100",
+    chip: "bg-sky-500/12 text-sky-700 border-sky-500/25 dark:bg-sky-400/15 dark:text-sky-200 dark:border-sky-400/25",
     icon: Info,
+    glow: "bg-sky-500/5",
   },
   success: {
-    bar: "border-emerald-500/40 bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-50",
-    chip: "bg-emerald-500/15 text-emerald-900 border-emerald-500/40 dark:bg-emerald-400/20 dark:text-emerald-100",
+    bar: "border-l-[3px] border-emerald-500 bg-gradient-to-r from-emerald-50/90 to-emerald-100/60 dark:from-emerald-950/70 dark:to-emerald-900/40 text-emerald-900 dark:text-emerald-100",
+    chip: "bg-emerald-500/12 text-emerald-700 border-emerald-500/25 dark:bg-emerald-400/15 dark:text-emerald-200 dark:border-emerald-400/25",
     icon: CheckCircle2,
+    glow: "bg-emerald-500/5",
   },
   warning: {
-    bar: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950/50 dark:text-amber-50",
-    chip: "bg-amber-500/20 text-amber-900 border-amber-500/50 dark:bg-amber-400/25 dark:text-amber-100",
+    bar: "border-l-[3px] border-amber-500 bg-gradient-to-r from-amber-50/90 to-amber-100/60 dark:from-amber-950/70 dark:to-amber-900/40 text-amber-900 dark:text-amber-100",
+    chip: "bg-amber-500/12 text-amber-700 border-amber-500/25 dark:bg-amber-400/15 dark:text-amber-200 dark:border-amber-400/25",
     icon: AlertTriangle,
+    glow: "bg-amber-500/5",
   },
   important: {
-    bar: "border-rose-500/50 bg-rose-50 text-rose-950 dark:bg-rose-950/50 dark:text-rose-50",
-    chip: "bg-rose-500/20 text-rose-900 border-rose-500/50 dark:bg-rose-400/25 dark:text-rose-100",
+    bar: "border-l-[3px] border-rose-500 bg-gradient-to-r from-rose-50/90 to-rose-100/60 dark:from-rose-950/70 dark:to-rose-900/40 text-rose-900 dark:text-rose-100",
+    chip: "bg-rose-500/12 text-rose-700 border-rose-500/25 dark:bg-rose-400/15 dark:text-rose-200 dark:border-rose-400/25",
     icon: Megaphone,
+    glow: "bg-rose-500/5",
   },
   custom: {
-    bar: "border-fuchsia-500/40 bg-fuchsia-50 text-fuchsia-950 dark:bg-fuchsia-950/50 dark:text-fuchsia-50",
-    chip: "bg-fuchsia-500/15 text-fuchsia-900 border-fuchsia-500/40 dark:bg-fuchsia-400/20 dark:text-fuchsia-100",
+    bar: "border-l-[3px] border-violet-500 bg-gradient-to-r from-violet-50/90 to-violet-100/60 dark:from-violet-950/70 dark:to-violet-900/40 text-violet-900 dark:text-violet-100",
+    chip: "bg-violet-500/12 text-violet-700 border-violet-500/25 dark:bg-violet-400/15 dark:text-violet-200 dark:border-violet-400/25",
     icon: Sparkles,
+    glow: "bg-violet-500/5",
   },
 };
 
@@ -139,23 +152,28 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
     <div
       role="status"
       aria-live="polite"
-      className={`group relative overflow-hidden rounded-2xl border ${styles.bar} backdrop-blur-md shadow-sm`}
+      className={`group relative overflow-hidden rounded-xl ${styles.bar} shadow-[0_2px_8px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.03] dark:ring-white/[0.04]`}
     >
-      <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+      {/* Subtle ambient glow */}
+      <div className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-3xl ${styles.glow}`} />
+      <div className={`pointer-events-none absolute -bottom-6 -left-4 h-16 w-16 rounded-full blur-2xl ${styles.glow}`} />
+
+      <div className="relative flex items-center gap-3.5 px-4 py-3 sm:px-5 sm:py-3.5">
+        {/* Icon badge */}
         <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest ${styles.chip}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${styles.chip} shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]`}
         >
-          <Icon className="h-3 w-3" />
+          <Icon className="h-3.5 w-3.5" />
           {title || (value.type === "important" ? "Important" : value.type === "warning" ? "Alert" : "Notice")}
         </span>
 
         {isTicker ? (
           <div
             className="relative min-w-0 flex-1 overflow-hidden"
-            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
+            style={{ maskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)" }}
           >
             <div
-              className={`notice-ticker flex w-max whitespace-nowrap text-sm font-medium ${
+              className={`notice-ticker flex w-max whitespace-nowrap text-[13px] font-semibold tracking-wide ${
                 value.pauseOnHover ? "hover:[animation-play-state:paused]" : ""
               }`}
               style={{
@@ -169,7 +187,7 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
             </div>
           </div>
         ) : (
-          <div className="min-w-0 flex-1 whitespace-pre-line text-sm font-medium leading-relaxed">
+          <div className="min-w-0 flex-1 whitespace-pre-line text-[13px] font-semibold leading-relaxed tracking-wide">
             {content}
           </div>
         )}
