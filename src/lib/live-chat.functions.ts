@@ -32,6 +32,7 @@ export type ChatConversation = {
   guest_name: string | null;
   guest_email: string | null;
   subject: string | null;
+  title: string | null;
   status: ChatStatus;
   priority: ChatPriority;
   assigned_to: string | null;
@@ -42,9 +43,15 @@ export type ChatConversation = {
   last_message_preview: string | null;
   created_at: string;
   updated_at: string;
-  // joined display fields
+  expires_at?: string;
+  // joined display fields (admin views)
   display_name?: string | null;
   display_email?: string | null;
+  user_role?: string | null;
+  user_last_seen_at?: string | null;
+  user_online?: boolean;
+  assigned_to_name?: string | null;
+  assigned_to_role?: string | null;
 };
 
 export type ChatMessage = {
@@ -68,6 +75,13 @@ export type ChatNote = {
   created_at: string;
 };
 
+export type StaffMember = {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string;
+};
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -85,8 +99,60 @@ async function ensureStaff(supabase: any, userId: string, permission?: string) {
   }
 }
 
+async function ensureSuperAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase.rpc("has_role", {
+    _user_id: userId,
+    _role: "super_admin",
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden: super admin role required");
+}
+
 const sanitizeBody = (s: string) =>
   s.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, 4000);
+
+/** Look up auth emails for a set of user ids using supabaseAdmin. */
+async function lookupAuthEmails(
+  supabaseAdmin: any,
+  ids: string[],
+): Promise<Map<string, { email: string | null; last_sign_in_at: string | null }>> {
+  const out = new Map<string, { email: string | null; last_sign_in_at: string | null }>();
+  if (ids.length === 0) return out;
+  const idSet = new Set(ids);
+  const maxPages = 8;
+  for (let page = 1; page <= maxPages && idSet.size > out.size; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) break;
+    const users = (data?.users ?? []) as Array<{
+      id: string;
+      email?: string | null;
+      last_sign_in_at?: string | null;
+    }>;
+    for (const u of users) {
+      if (idSet.has(u.id)) {
+        out.set(u.id, {
+          email: u.email ?? null,
+          last_sign_in_at: u.last_sign_in_at ?? null,
+        });
+      }
+    }
+    if (users.length < 200) break;
+  }
+  for (const id of ids) if (!out.has(id)) out.set(id, { email: null, last_sign_in_at: null });
+  return out;
+}
+
+async function lookupTopRoles(supabaseAdmin: any, ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  const { data } = await supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids);
+  const RANK: Record<string, number> = { super_admin: 5, admin: 4, moderator: 3, student: 2, user: 1 };
+  for (const r of (data ?? []) as Array<{ user_id: string; role: string }>) {
+    const prev = out.get(r.user_id);
+    if (!prev || (RANK[r.role] ?? 0) > (RANK[prev] ?? 0)) out.set(r.user_id, r.role);
+  }
+  return out;
+}
 
 // ============================================================
 // SETTINGS
@@ -132,14 +198,15 @@ export const updateChatSettings = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// USER SIDE
+// USER SIDE — multi-conversation
 // ============================================================
+
+/** @deprecated kept for back-compat: returns latest open or creates new. */
 export const getOrCreateMyConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(noInput)
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    // Try existing open conversation
     const { data: existing, error: e1 } = await asAny(supabase)
       .from("live_chat_conversations")
       .select("*")
@@ -173,6 +240,30 @@ export const listMyConversations = createServerFn({ method: "GET" })
     return (data ?? []) as ChatConversation[];
   });
 
+const startConversationSchema = z
+  .object({ subject: z.string().max(200).optional() })
+  .optional()
+  .default({});
+
+export const startNewConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => startConversationSchema.parse(input ?? {}))
+  .handler(async ({ data, context }) => {
+    const subject = data.subject?.trim() || null;
+    const { data: created, error } = await asAny(context.supabase)
+      .from("live_chat_conversations")
+      .insert({
+        user_id: context.userId,
+        status: "new",
+        subject,
+        title: subject,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return created as ChatConversation;
+  });
+
 const conversationIdSchema = z.object({ conversation_id: z.string().uuid() });
 
 export const listConversationMessages = createServerFn({ method: "POST" })
@@ -202,7 +293,6 @@ export const userSendMessage = createServerFn({ method: "POST" })
     const body = sanitizeBody(data.body);
     if (!body) throw new Error("Message is empty");
 
-    // Verify ownership
     const { data: conv, error: cErr } = await asAny(context.supabase)
       .from("live_chat_conversations")
       .select("id, user_id, is_blocked")
@@ -225,13 +315,12 @@ export const userSendMessage = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    // Notify admins/assigned staff (best-effort via admin client)
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: admins } = await asAny(supabaseAdmin)
         .from("user_roles")
         .select("user_id")
-        .eq("role", "admin");
+        .in("role", ["admin", "super_admin"]);
       const recipients = new Set<string>((admins ?? []).map((r: any) => r.user_id));
       const { data: convRow } = await asAny(supabaseAdmin)
         .from("live_chat_conversations")
@@ -269,7 +358,6 @@ export const userMarkRead = createServerFn({ method: "POST" })
       .eq("id", data.conversation_id)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    // Mark staff messages as read
     await asAny(context.supabase)
       .from("live_chat_messages")
       .update({ read_at: now })
@@ -288,10 +376,12 @@ const adminListSchema = z
       .enum(["all", "unread", "open", "pending", "closed", "mine", "high_priority"])
       .optional(),
     search: z.string().max(200).optional(),
-    limit: z.number().int().min(1).max(200).optional(),
+    limit: z.number().int().min(1).max(500).optional(),
   })
   .optional()
   .default({});
+
+const ONLINE_WINDOW_MS = 5 * 60_000;
 
 export const adminListConversations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -303,7 +393,7 @@ export const adminListConversations = createServerFn({ method: "POST" })
       .from("live_chat_conversations")
       .select("*")
       .order("last_message_at", { ascending: false })
-      .limit(data.limit ?? 100);
+      .limit(data.limit ?? 200);
 
     switch (data.filter) {
       case "unread":
@@ -329,25 +419,49 @@ export const adminListConversations = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const convs = (rows ?? []) as ChatConversation[];
 
-    // Enrich with profile display name/email
     const userIds = Array.from(new Set(convs.map((c) => c.user_id).filter(Boolean) as string[]));
-    let profilesById = new Map<string, { full_name: string | null; email: string | null }>();
-    if (userIds.length > 0) {
+    const assigneeIds = Array.from(
+      new Set(convs.map((c) => c.assigned_to).filter(Boolean) as string[]),
+    );
+    const allIds = Array.from(new Set([...userIds, ...assigneeIds]));
+
+    let profilesById = new Map<string, { display_name: string | null; avatar_url: string | null }>();
+    if (allIds.length > 0) {
       const { data: profs } = await asAny(supabaseAdmin)
         .from("profiles")
-        .select("id, full_name, email")
-        .in("id", userIds);
+        .select("id, display_name, avatar_url")
+        .in("id", allIds);
       profilesById = new Map(
-        (profs ?? []).map((p: any) => [p.id, { full_name: p.full_name, email: p.email }]),
+        (profs ?? []).map((p: any) => [
+          p.id,
+          { display_name: p.display_name, avatar_url: p.avatar_url },
+        ]),
       );
     }
+    const emailsById = await lookupAuthEmails(supabaseAdmin, allIds);
+    const rolesById = await lookupTopRoles(supabaseAdmin, allIds);
+
+    const now = Date.now();
     const enriched = convs.map((c) => {
       const p = c.user_id ? profilesById.get(c.user_id) : undefined;
+      const ae = c.user_id ? emailsById.get(c.user_id) : undefined;
+      const userRole = c.user_id ? rolesById.get(c.user_id) ?? "user" : null;
+      const lastSeen = c.user_last_seen_at ? new Date(c.user_last_seen_at).getTime() : 0;
+      const online = lastSeen > 0 && now - lastSeen < ONLINE_WINDOW_MS;
+
+      const assignee = c.assigned_to ? profilesById.get(c.assigned_to) : undefined;
+      const assigneeRole = c.assigned_to ? rolesById.get(c.assigned_to) ?? "staff" : null;
+
       return {
         ...c,
-        display_name: p?.full_name ?? c.guest_name ?? "User",
-        display_email: p?.email ?? c.guest_email ?? null,
-      };
+        display_name:
+          p?.display_name ?? c.guest_name ?? ae?.email ?? `User ${c.user_id?.slice(0, 6) ?? ""}`,
+        display_email: ae?.email ?? c.guest_email ?? null,
+        user_role: userRole,
+        user_online: online,
+        assigned_to_name: assignee?.display_name ?? null,
+        assigned_to_role: assigneeRole,
+      } satisfies ChatConversation;
     });
 
     if (data.search && data.search.trim()) {
@@ -376,16 +490,94 @@ export const adminGetConversation = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    let profile: any = null;
+    let profile: {
+      id: string;
+      display_name: string | null;
+      email: string | null;
+      avatar_url: string | null;
+      role: string | null;
+      created_at: string | null;
+      last_sign_in_at: string | null;
+      total_conversations: number;
+      active_conversations: number;
+    } | null = null;
+    let previousConversations: ChatConversation[] = [];
+    let assignee: StaffMember | null = null;
+
     if (conv?.user_id) {
-      const { data: p } = await asAny(supabaseAdmin)
-        .from("profiles")
-        .select("id, full_name, email, avatar_url, created_at")
-        .eq("id", conv.user_id)
-        .maybeSingle();
-      profile = p ?? null;
+      const [{ data: p }, emails, roles] = await Promise.all([
+        asAny(supabaseAdmin)
+          .from("profiles")
+          .select("id, display_name, avatar_url, created_at")
+          .eq("id", conv.user_id)
+          .maybeSingle(),
+        lookupAuthEmails(supabaseAdmin, [conv.user_id]),
+        lookupTopRoles(supabaseAdmin, [conv.user_id]),
+      ]);
+      const ae = emails.get(conv.user_id);
+      const { data: priors } = await asAny(supabaseAdmin)
+        .from("live_chat_conversations")
+        .select("id, subject, status, last_message_at, last_message_preview, created_at")
+        .eq("user_id", conv.user_id)
+        .neq("id", conv.id)
+        .order("last_message_at", { ascending: false })
+        .limit(20);
+      const { count: total } = await asAny(supabaseAdmin)
+        .from("live_chat_conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", conv.user_id);
+      const { count: active } = await asAny(supabaseAdmin)
+        .from("live_chat_conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", conv.user_id)
+        .not("status", "in", "(closed,resolved)");
+
+      previousConversations = (priors ?? []) as ChatConversation[];
+      profile = {
+        id: conv.user_id,
+        display_name: p?.display_name ?? null,
+        email: ae?.email ?? null,
+        avatar_url: p?.avatar_url ?? null,
+        role: roles.get(conv.user_id) ?? "user",
+        created_at: p?.created_at ?? null,
+        last_sign_in_at: ae?.last_sign_in_at ?? null,
+        total_conversations: total ?? 0,
+        active_conversations: active ?? 0,
+      };
     }
-    return { conversation: conv as ChatConversation, profile };
+
+    if (conv?.assigned_to) {
+      const [{ data: ap }, emails, roles] = await Promise.all([
+        asAny(supabaseAdmin)
+          .from("profiles")
+          .select("id, display_name")
+          .eq("id", conv.assigned_to)
+          .maybeSingle(),
+        lookupAuthEmails(supabaseAdmin, [conv.assigned_to]),
+        lookupTopRoles(supabaseAdmin, [conv.assigned_to]),
+      ]);
+      assignee = {
+        id: conv.assigned_to,
+        name: ap?.display_name ?? "Staff",
+        email: emails.get(conv.assigned_to)?.email ?? null,
+        role: roles.get(conv.assigned_to) ?? "staff",
+      };
+    }
+
+    const { data: history } = await asAny(supabaseAdmin)
+      .from("live_chat_assignment_history")
+      .select("*")
+      .eq("conversation_id", data.conversation_id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    return {
+      conversation: conv as ChatConversation,
+      profile,
+      previousConversations,
+      assignee,
+      assignmentHistory: history ?? [],
+    };
   });
 
 export const adminListMessages = createServerFn({ method: "POST" })
@@ -398,6 +590,7 @@ export const adminListMessages = createServerFn({ method: "POST" })
       .from("live_chat_messages")
       .select("*")
       .eq("conversation_id", data.conversation_id)
+      .eq("is_deleted", false)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return (rows ?? []) as ChatMessage[];
@@ -450,7 +643,6 @@ const updateConvSchema = z.object({
   conversation_id: z.string().uuid(),
   status: z.enum(["new", "open", "pending", "waiting_user", "resolved", "closed"]).optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  assigned_to: z.string().uuid().nullable().optional(),
   is_blocked: z.boolean().optional(),
 });
 
@@ -461,25 +653,122 @@ export const adminUpdateConversation = createServerFn({ method: "POST" })
     await ensureStaff(context.supabase, context.userId, "view");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { conversation_id, ...patch } = data;
-
-    if ("assigned_to" in patch) {
-      await ensureStaff(context.supabase, context.userId, "assign");
-      await asAny(supabaseAdmin)
-        .from("live_chat_assignments")
-        .insert({
-          conversation_id,
-          assigned_to: patch.assigned_to ?? null,
-          assigned_by: context.userId,
-        });
-    }
     if (patch.status === "closed" || patch.status === "resolved") {
       await ensureStaff(context.supabase, context.userId, "close");
     }
-
     const { error } = await asAny(supabaseAdmin)
       .from("live_chat_conversations")
       .update(patch)
       .eq("id", conversation_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ----- Assignment (super_admin only) -----
+const assignSchema = z.object({
+  conversation_id: z.string().uuid(),
+  assigned_to: z.string().uuid().nullable(),
+  note: z.string().max(500).optional(),
+});
+
+export const adminAssignConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => assignSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await ensureSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prev } = await asAny(supabaseAdmin)
+      .from("live_chat_conversations")
+      .select("assigned_to")
+      .eq("id", data.conversation_id)
+      .single();
+
+    const { error } = await asAny(supabaseAdmin)
+      .from("live_chat_conversations")
+      .update({ assigned_to: data.assigned_to })
+      .eq("id", data.conversation_id);
+    if (error) throw new Error(error.message);
+
+    await asAny(supabaseAdmin).from("live_chat_assignment_history").insert({
+      conversation_id: data.conversation_id,
+      assigned_to: data.assigned_to,
+      assigned_by: context.userId,
+      previous_assignee: prev?.assigned_to ?? null,
+      note: data.note ?? null,
+    });
+
+    if (data.assigned_to) {
+      await asAny(supabaseAdmin).from("live_chat_notifications").insert({
+        recipient_id: data.assigned_to,
+        conversation_id: data.conversation_id,
+        kind: "assigned",
+        payload: { by: context.userId },
+      });
+    }
+    return { ok: true };
+  });
+
+// ----- Delete (super_admin only) -----
+const deleteMessageSchema = z.object({ message_id: z.string().uuid() });
+export const adminDeleteMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => deleteMessageSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await ensureSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Remove any attached storage objects first
+    const { data: msg } = await asAny(supabaseAdmin)
+      .from("live_chat_messages")
+      .select("attachments")
+      .eq("id", data.message_id)
+      .single();
+    const paths: string[] = ((msg?.attachments ?? []) as Array<{ path?: string }>)
+      .map((a) => a?.path ?? "")
+      .filter(Boolean);
+    if (paths.length > 0) {
+      try {
+        await asAny(supabaseAdmin).storage.from("chat-attachments").remove(paths);
+      } catch {
+        /* non-blocking */
+      }
+    }
+    const { error } = await asAny(supabaseAdmin)
+      .from("live_chat_messages")
+      .delete()
+      .eq("id", data.message_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => conversationIdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await ensureSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Collect attachment paths from all messages
+    const { data: msgs } = await asAny(supabaseAdmin)
+      .from("live_chat_messages")
+      .select("attachments")
+      .eq("conversation_id", data.conversation_id);
+    const paths = ((msgs ?? []) as Array<{ attachments: Array<{ path?: string }> }>)
+      .flatMap((m) => m.attachments ?? [])
+      .map((a) => a?.path ?? "")
+      .filter(Boolean);
+    if (paths.length > 0) {
+      try {
+        await asAny(supabaseAdmin).storage.from("chat-attachments").remove(paths);
+      } catch {
+        /* non-blocking */
+      }
+    }
+    // Cascade handles messages/notes/assignments/notifications
+    const { error } = await asAny(supabaseAdmin)
+      .from("live_chat_conversations")
+      .delete()
+      .eq("id", data.conversation_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -524,36 +813,38 @@ export const adminAddNote = createServerFn({ method: "POST" })
     return row as ChatNote;
   });
 
-// Staff list for assignment dropdown
 export const adminListStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(noInput)
   .handler(async ({ context }) => {
     await ensureStaff(context.supabase, context.userId, "view");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: admins } = await asAny(supabaseAdmin)
+    const { data: rolesRows } = await asAny(supabaseAdmin)
       .from("user_roles")
-      .select("user_id")
-      .eq("role", "admin");
+      .select("user_id, role")
+      .in("role", ["super_admin", "admin", "moderator"]);
     const { data: perms } = await asAny(supabaseAdmin)
       .from("live_chat_permissions")
       .select("user_id");
     const ids = Array.from(
       new Set<string>([
-        ...((admins ?? []).map((r: any) => r.user_id) as string[]),
+        ...((rolesRows ?? []).map((r: any) => r.user_id) as string[]),
         ...((perms ?? []).map((r: any) => r.user_id) as string[]),
       ]),
     );
-    if (ids.length === 0) return [] as { id: string; name: string; email: string | null }[];
-    const { data: profs } = await asAny(supabaseAdmin)
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", ids);
-    return (profs ?? []).map((p: any) => ({
-      id: p.id,
-      name: p.full_name ?? "Staff",
-      email: p.email,
-    }));
+    if (ids.length === 0) return [] as StaffMember[];
+    const [{ data: profs }, emails, roles] = await Promise.all([
+      asAny(supabaseAdmin).from("profiles").select("id, display_name").in("id", ids),
+      lookupAuthEmails(supabaseAdmin, ids),
+      lookupTopRoles(supabaseAdmin, ids),
+    ]);
+    const byId = new Map((profs ?? []).map((p: any) => [p.id, p.display_name as string | null]));
+    return ids.map((id) => ({
+      id,
+      name: byId.get(id) ?? "Staff",
+      email: emails.get(id)?.email ?? null,
+      role: roles.get(id) ?? "staff",
+    })) as StaffMember[];
   });
 
 // Analytics
@@ -576,7 +867,6 @@ export const adminChatAnalytics = createServerFn({ method: "GET" })
     const active = list.filter((c) => !["closed", "resolved"].includes(c.status)).length;
     const closed = list.filter((c) => ["closed", "resolved"].includes(c.status)).length;
     const open = list.filter((c) => c.status === "open" || c.status === "new").length;
-    // 7-day trend
     const days: Record<string, number> = {};
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
