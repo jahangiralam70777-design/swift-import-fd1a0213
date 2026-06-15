@@ -152,10 +152,10 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
         {isTicker ? (
           <div
             className="relative min-w-0 flex-1 overflow-hidden"
-            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
+            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
           >
             <div
-              className={`notice-ticker flex w-max items-center gap-16 whitespace-nowrap text-sm font-medium ${
+              className={`notice-ticker flex w-max whitespace-nowrap text-sm font-medium ${
                 value.pauseOnHover ? "hover:[animation-play-state:paused]" : ""
               }`}
               style={{
@@ -163,9 +163,9 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
                 animationIterationCount: value.loop ? "infinite" : 1,
               }}
             >
-              {/* Duplicate the content twice so the loop is seamless */}
-              <span className="px-2">{content}</span>
-              <span aria-hidden className="px-2">{content}</span>
+              {/* Two identical halves; translateX(-50%) yields a seamless loop */}
+              <span className="pr-16">{content}</span>
+              <span aria-hidden className="pr-16">{content}</span>
             </div>
           </div>
         ) : (
