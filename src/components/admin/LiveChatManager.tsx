@@ -182,7 +182,7 @@ export function LiveChatManager() {
   });
 
   const updateMut = useMutation({
-    mutationFn: async (patch: Parameters<typeof updateFn>[0]["data"]) =>
+    mutationFn: async (patch: Parameters<typeof adminUpdateConversation>[0]["data"]) =>
       updateFn({ data: patch }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "chat", "list"] });
