@@ -20,6 +20,7 @@ import {
   XCircle,
   Globe,
   Newspaper,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
