@@ -2,218 +2,217 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { MessageCircle, Loader2, Save } from "lucide-react";
+import { Loader2, Save, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  adminListSettings,
-  adminUpdateSettingDraft,
-  adminPublishSetting,
-} from "@/lib/site-management.functions";
-import {
-  LIVE_CHAT_DEFAULTS,
-  type LiveChatWidgetSettings as LCWValue,
-} from "@/components/site/LiveChatWidget";
+import { getChatSettings, updateChatSettings, type ChatSettings } from "@/lib/live-chat.functions";
 
-const SETTING_KEY = "live_chat_widget";
-
-function coerce(v: unknown): LCWValue {
-  const o = (v ?? {}) as Partial<LCWValue>;
-  const pos = o.position === "bottom-left" ? "bottom-left" : "bottom-right";
-  return {
-    enabled: Boolean(o.enabled),
-    whatsapp_number: typeof o.whatsapp_number === "string" ? o.whatsapp_number : "",
-    chat_message:
-      typeof o.chat_message === "string" && o.chat_message.length > 0
-        ? o.chat_message
-        : LIVE_CHAT_DEFAULTS.chat_message,
-    position: pos,
-    heading:
-      typeof o.heading === "string" && o.heading.length > 0
-        ? o.heading
-        : LIVE_CHAT_DEFAULTS.heading,
-    subheading:
-      typeof o.subheading === "string" && o.subheading.length > 0
-        ? o.subheading
-        : LIVE_CHAT_DEFAULTS.subheading,
-  };
-}
+const DEFAULT: ChatSettings = {
+  enabled: true,
+  position: "bottom-right",
+  theme_color: "#3b82f6",
+  welcome_message: "Hi! How can we help today?",
+  offline_message: "We're offline — leave a message and we'll reply by email.",
+  email_notifications: true,
+  sound_notifications: true,
+  auto_assignment_enabled: false,
+  attachment_max_mb: 10,
+  rate_limit_per_minute: 20,
+};
 
 export function LiveChatWidgetSettingsPanel() {
   const qc = useQueryClient();
-  const list = useServerFn(adminListSettings);
-  const updateDraft = useServerFn(adminUpdateSettingDraft);
-  const publish = useServerFn(adminPublishSetting);
+  const fetchSettings = useServerFn(getChatSettings);
+  const update = useServerFn(updateChatSettings);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "settings", SETTING_KEY],
-    queryFn: async () => {
-      const res = await list();
-      const row = (res.settings ?? []).find((r: { key: string }) => r.key === SETTING_KEY);
-      return coerce(row?.draft_value ?? row?.published_value ?? {});
-    },
+    queryKey: ["admin", "chat-settings"],
+    queryFn: () => fetchSettings(),
   });
-
-  const [form, setForm] = useState<LCWValue>(LIVE_CHAT_DEFAULTS);
+  const [form, setForm] = useState<ChatSettings>(DEFAULT);
   useEffect(() => {
     if (data) setForm(data);
   }, [data]);
 
-  const save = useMutation({
-    mutationFn: async (value: LCWValue) => {
-      const normalized: LCWValue = {
-        enabled: !!value.enabled,
-        whatsapp_number: value.whatsapp_number.trim(),
-        chat_message: value.chat_message.trim() || LIVE_CHAT_DEFAULTS.chat_message,
-        position: value.position === "bottom-left" ? "bottom-left" : "bottom-right",
-        heading: value.heading.trim() || LIVE_CHAT_DEFAULTS.heading,
-        subheading: value.subheading.trim() || LIVE_CHAT_DEFAULTS.subheading,
-      };
-      await updateDraft({ data: { key: SETTING_KEY, draftValue: normalized } });
-      await publish({ data: { key: SETTING_KEY } });
-      return normalized;
-    },
+  const mut = useMutation({
+    mutationFn: async (next: Partial<ChatSettings>) => update({ data: next }),
     onSuccess: () => {
-      toast.success("Live chat widget saved");
-      qc.invalidateQueries({ queryKey: ["admin", "settings", SETTING_KEY] });
-      qc.invalidateQueries({ queryKey: ["site-settings"] });
+      toast.success("Live chat settings saved");
+      qc.invalidateQueries({ queryKey: ["admin", "chat-settings"] });
+      qc.invalidateQueries({ queryKey: ["chat", "settings"] });
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save"),
+    onError: (e) => toast.error((e as Error).message),
   });
 
-  const numberOk = /^\+?\d{6,16}$/.test(form.whatsapp_number.trim());
+  const set = <K extends keyof ChatSettings>(k: K, v: ChatSettings[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  if (isLoading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <section className="glass shadow-card-soft relative overflow-hidden rounded-3xl p-5">
-      <div
-        className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl"
-        style={{ background: "#25D36633" }}
-      />
-      <div className="relative flex items-start gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-background/40"
-          style={{ boxShadow: "0 0 16px #25D36655" }}
-        >
-          <MessageCircle className="h-5 w-5" style={{ color: "#25D366" }} />
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 border-b border-border pb-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <MessageCircle className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-display text-lg font-bold">Live Chat Widget Control</h2>
+          <h3 className="text-base font-semibold">Live Chat Widget</h3>
           <p className="text-xs text-muted-foreground">
-            Floating chat bubble on the student dashboard. Updates reach all sessions within
-            seconds — no refresh needed.
+            Real-time support chat — changes apply instantly to all students.
           </p>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-        </div>
-      ) : (
-        <div className="relative mt-5 space-y-4">
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-background/30 p-3">
-            <div>
-              <div className="text-sm font-semibold">Enable Live Chat Widget</div>
-              <p className="text-xs text-muted-foreground">
-                When OFF, the widget is hidden everywhere.
-              </p>
-            </div>
-            <Switch
-              checked={form.enabled}
-              onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
-            />
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="flex items-center justify-between rounded-xl border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Enable Live Chat</p>
+            <p className="text-xs text-muted-foreground">Show the floating widget</p>
           </div>
+          <Switch checked={form.enabled} onCheckedChange={(v) => set("enabled", v)} />
+        </label>
 
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              WhatsApp Number
-            </span>
+        <label className="flex items-center justify-between rounded-xl border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Email notifications</p>
+            <p className="text-xs text-muted-foreground">Notify staff via email</p>
+          </div>
+          <Switch
+            checked={form.email_notifications}
+            onCheckedChange={(v) => set("email_notifications", v)}
+          />
+        </label>
+
+        <label className="flex items-center justify-between rounded-xl border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Sound notifications</p>
+            <p className="text-xs text-muted-foreground">Play sound on new message</p>
+          </div>
+          <Switch
+            checked={form.sound_notifications}
+            onCheckedChange={(v) => set("sound_notifications", v)}
+          />
+        </label>
+
+        <label className="flex items-center justify-between rounded-xl border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Auto assignment</p>
+            <p className="text-xs text-muted-foreground">Round-robin to staff</p>
+          </div>
+          <Switch
+            checked={form.auto_assignment_enabled}
+            onCheckedChange={(v) => set("auto_assignment_enabled", v)}
+          />
+        </label>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Position</label>
+          <select
+            value={form.position}
+            onChange={(e) => set("position", e.target.value as ChatSettings["position"])}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="bottom-right">Bottom Right</option>
+            <option value="bottom-left">Bottom Left</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Theme color
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={form.theme_color}
+              onChange={(e) => set("theme_color", e.target.value)}
+              className="h-10 w-14 cursor-pointer rounded-lg border border-input bg-background"
+            />
             <Input
-              value={form.whatsapp_number}
-              onChange={(e) => setForm((f) => ({ ...f, whatsapp_number: e.target.value }))}
-              placeholder="+8801XXXXXXXXX"
-              inputMode="tel"
-              maxLength={20}
+              value={form.theme_color}
+              onChange={(e) => set("theme_color", e.target.value)}
+              placeholder="#3b82f6"
+              maxLength={7}
             />
-            {!numberOk && form.whatsapp_number.length > 0 && (
-              <span className="text-[11px] text-amber-500">
-                Enter international format, digits only (6–16 digits, optional leading +).
-              </span>
-            )}
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Default Message
-            </span>
-            <Textarea
-              value={form.chat_message}
-              onChange={(e) => setForm((f) => ({ ...f, chat_message: e.target.value }))}
-              rows={2}
-              maxLength={500}
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Panel Heading
-              </span>
-              <Input
-                value={form.heading}
-                onChange={(e) => setForm((f) => ({ ...f, heading: e.target.value }))}
-                maxLength={80}
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Subheading
-              </span>
-              <Input
-                value={form.subheading}
-                onChange={(e) => setForm((f) => ({ ...f, subheading: e.target.value }))}
-                maxLength={160}
-              />
-            </label>
-          </div>
-
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Widget Position
-            </span>
-            <select
-              value={form.position}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  position: e.target.value === "bottom-left" ? "bottom-left" : "bottom-right",
-                }))
-              }
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            >
-              <option value="bottom-right">Bottom Right (default)</option>
-              <option value="bottom-left">Bottom Left</option>
-            </select>
-          </label>
-
-          <div className="flex justify-end">
-            <Button
-              onClick={() => save.mutate(form)}
-              disabled={save.isPending || (form.enabled && !numberOk)}
-              className="gap-2"
-            >
-              {save.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Save &amp; Publish
-            </Button>
           </div>
         </div>
-      )}
-    </section>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Attachment limit (MB)
+          </label>
+          <Input
+            type="number"
+            value={form.attachment_max_mb}
+            onChange={(e) => set("attachment_max_mb", Math.max(1, Number(e.target.value) || 10))}
+            min={1}
+            max={50}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Rate limit (msgs/min)
+          </label>
+          <Input
+            type="number"
+            value={form.rate_limit_per_minute}
+            onChange={(e) =>
+              set("rate_limit_per_minute", Math.max(1, Number(e.target.value) || 20))
+            }
+            min={1}
+            max={120}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Welcome message
+          </label>
+          <Textarea
+            value={form.welcome_message}
+            onChange={(e) => set("welcome_message", e.target.value)}
+            maxLength={500}
+            rows={2}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Offline message
+          </label>
+          <Textarea
+            value={form.offline_message}
+            onChange={(e) => set("offline_message", e.target.value)}
+            maxLength={500}
+            rows={2}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          onClick={() => mut.mutate(form)}
+          disabled={mut.isPending}
+          className="bg-cta-gradient text-white shadow-glow"
+        >
+          {mut.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="mr-2 h-4 w-4" />
+          )}
+          Save settings
+        </Button>
+      </div>
+    </div>
   );
 }
