@@ -173,7 +173,7 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
             style={{ maskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)" }}
           >
             <div
-              className={`notice-ticker flex w-max whitespace-nowrap text-[13px] font-semibold tracking-wide ${
+              className={`notice-ticker flex w-max whitespace-nowrap text-sm font-bold tracking-wide ${
                 value.pauseOnHover ? "hover:[animation-play-state:paused]" : ""
               }`}
               style={{
@@ -187,7 +187,7 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
             </div>
           </div>
         ) : (
-          <div className="min-w-0 flex-1 whitespace-pre-line text-[13px] font-semibold leading-relaxed tracking-wide">
+          <div className="min-w-0 flex-1 whitespace-pre-line text-sm font-semibold leading-relaxed tracking-wide">
             {content}
           </div>
         )}
