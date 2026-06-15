@@ -53,7 +53,7 @@ export type ChatMessage = {
   sender_type: ChatSender;
   sender_user_id: string | null;
   body: string | null;
-  attachments: unknown[];
+  attachments: Array<{ path?: string; name?: string; type?: string; size?: number }>;
   delivered_at: string | null;
   read_at: string | null;
   is_deleted: boolean;
