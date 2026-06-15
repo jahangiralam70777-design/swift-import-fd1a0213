@@ -152,23 +152,28 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
     <div
       role="status"
       aria-live="polite"
-      className={`group relative overflow-hidden rounded-2xl border ${styles.bar} backdrop-blur-md shadow-sm`}
+      className={`group relative overflow-hidden rounded-xl ${styles.bar} shadow-[0_2px_8px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.25),0_1px_3px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.03] dark:ring-white/[0.04]`}
     >
-      <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+      {/* Subtle ambient glow */}
+      <div className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-3xl ${styles.glow}`} />
+      <div className={`pointer-events-none absolute -bottom-6 -left-4 h-16 w-16 rounded-full blur-2xl ${styles.glow}`} />
+
+      <div className="relative flex items-center gap-3.5 px-4 py-3 sm:px-5 sm:py-3.5">
+        {/* Icon badge */}
         <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest ${styles.chip}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${styles.chip} shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]`}
         >
-          <Icon className="h-3 w-3" />
+          <Icon className="h-3.5 w-3.5" />
           {title || (value.type === "important" ? "Important" : value.type === "warning" ? "Alert" : "Notice")}
         </span>
 
         {isTicker ? (
           <div
             className="relative min-w-0 flex-1 overflow-hidden"
-            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
+            style={{ maskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)" }}
           >
             <div
-              className={`notice-ticker flex w-max whitespace-nowrap text-sm font-medium ${
+              className={`notice-ticker flex w-max whitespace-nowrap text-[13px] font-semibold tracking-wide ${
                 value.pauseOnHover ? "hover:[animation-play-state:paused]" : ""
               }`}
               style={{
@@ -182,7 +187,7 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
             </div>
           </div>
         ) : (
-          <div className="min-w-0 flex-1 whitespace-pre-line text-sm font-medium leading-relaxed">
+          <div className="min-w-0 flex-1 whitespace-pre-line text-[13px] font-semibold leading-relaxed tracking-wide">
             {content}
           </div>
         )}
