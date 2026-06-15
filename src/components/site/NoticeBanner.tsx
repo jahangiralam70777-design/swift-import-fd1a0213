@@ -44,34 +44,34 @@ const TYPE_STYLES: Record<
   }
 > = {
   info: {
-    bar: "border-l-[3px] border-sky-500 bg-gradient-to-r from-sky-50/90 to-sky-100/60 dark:from-sky-950/70 dark:to-sky-900/40 text-sky-900 dark:text-sky-100",
-    chip: "bg-sky-500/12 text-sky-700 border-sky-500/25 dark:bg-sky-400/15 dark:text-sky-200 dark:border-sky-400/25",
+    bar: "border-l-[4px] border-sky-600 dark:border-sky-400 bg-gradient-to-r from-sky-100 to-sky-50 dark:from-sky-950 dark:to-sky-900/60 text-sky-950 dark:text-sky-50",
+    chip: "bg-sky-600 text-white border-sky-700 dark:bg-sky-400 dark:text-sky-950 dark:border-sky-300",
     icon: Info,
-    glow: "bg-sky-500/5",
+    glow: "bg-sky-500/10 dark:bg-sky-400/10",
   },
   success: {
-    bar: "border-l-[3px] border-emerald-500 bg-gradient-to-r from-emerald-50/90 to-emerald-100/60 dark:from-emerald-950/70 dark:to-emerald-900/40 text-emerald-900 dark:text-emerald-100",
-    chip: "bg-emerald-500/12 text-emerald-700 border-emerald-500/25 dark:bg-emerald-400/15 dark:text-emerald-200 dark:border-emerald-400/25",
+    bar: "border-l-[4px] border-emerald-600 dark:border-emerald-400 bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-950 dark:to-emerald-900/60 text-emerald-950 dark:text-emerald-50",
+    chip: "bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-400 dark:text-emerald-950 dark:border-emerald-300",
     icon: CheckCircle2,
-    glow: "bg-emerald-500/5",
+    glow: "bg-emerald-500/10 dark:bg-emerald-400/10",
   },
   warning: {
-    bar: "border-l-[3px] border-amber-500 bg-gradient-to-r from-amber-50/90 to-amber-100/60 dark:from-amber-950/70 dark:to-amber-900/40 text-amber-900 dark:text-amber-100",
-    chip: "bg-amber-500/12 text-amber-700 border-amber-500/25 dark:bg-amber-400/15 dark:text-amber-200 dark:border-amber-400/25",
+    bar: "border-l-[4px] border-amber-600 dark:border-amber-400 bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-950 dark:to-amber-900/60 text-amber-950 dark:text-amber-50",
+    chip: "bg-amber-600 text-white border-amber-700 dark:bg-amber-400 dark:text-amber-950 dark:border-amber-300",
     icon: AlertTriangle,
-    glow: "bg-amber-500/5",
+    glow: "bg-amber-500/10 dark:bg-amber-400/10",
   },
   important: {
-    bar: "border-l-[3px] border-rose-500 bg-gradient-to-r from-rose-50/90 to-rose-100/60 dark:from-rose-950/70 dark:to-rose-900/40 text-rose-900 dark:text-rose-100",
-    chip: "bg-rose-500/12 text-rose-700 border-rose-500/25 dark:bg-rose-400/15 dark:text-rose-200 dark:border-rose-400/25",
+    bar: "border-l-[4px] border-rose-600 dark:border-rose-400 bg-gradient-to-r from-rose-100 to-rose-50 dark:from-rose-950 dark:to-rose-900/60 text-rose-950 dark:text-rose-50",
+    chip: "bg-rose-600 text-white border-rose-700 dark:bg-rose-400 dark:text-rose-950 dark:border-rose-300",
     icon: Megaphone,
-    glow: "bg-rose-500/5",
+    glow: "bg-rose-500/10 dark:bg-rose-400/10",
   },
   custom: {
-    bar: "border-l-[3px] border-violet-500 bg-gradient-to-r from-violet-50/90 to-violet-100/60 dark:from-violet-950/70 dark:to-violet-900/40 text-violet-900 dark:text-violet-100",
-    chip: "bg-violet-500/12 text-violet-700 border-violet-500/25 dark:bg-violet-400/15 dark:text-violet-200 dark:border-violet-400/25",
+    bar: "border-l-[4px] border-violet-600 dark:border-violet-400 bg-gradient-to-r from-violet-100 to-violet-50 dark:from-violet-950 dark:to-violet-900/60 text-violet-950 dark:text-violet-50",
+    chip: "bg-violet-600 text-white border-violet-700 dark:bg-violet-400 dark:text-violet-950 dark:border-violet-300",
     icon: Sparkles,
-    glow: "bg-violet-500/5",
+    glow: "bg-violet-500/10 dark:bg-violet-400/10",
   },
 };
 
