@@ -48,8 +48,13 @@ export function useSiteSettings() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.settings as Record<string, Record<string, any>>;
     },
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
+    // Short stale time + window-focus refetch acts as a safety net so notice
+    // banner / live chat / whatsapp settings stay in sync even if the realtime
+    // publication is briefly unavailable.
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 30_000,
   });
 }
 

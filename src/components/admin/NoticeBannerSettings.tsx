@@ -104,6 +104,18 @@ export function NoticeBannerSettingsPanel() {
       toast.success("Notice banner saved", { description: "Students will see the update within seconds." });
       qc.invalidateQueries({ queryKey: ["admin", "settings", SETTING_KEY] });
       qc.invalidateQueries({ queryKey: ["site-settings"] });
+      // Broadcast to every other tab in the same browser so previews,
+      // admin tabs, and student sessions all refresh instantly even if
+      // the realtime publication is briefly unavailable.
+      try {
+        if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+          const ch = new BroadcastChannel("site-settings-sync");
+          ch.postMessage({ key: SETTING_KEY, at: Date.now() });
+          ch.close();
+        }
+      } catch {
+        /* noop */
+      }
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save"),
   });
