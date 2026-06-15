@@ -1,203 +1,387 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "@tanstack/react-router";
-import { MessageCircle, X, Send } from "lucide-react";
-import { useSetting } from "@/hooks/use-site-content";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  getChatSettings,
+  getOrCreateMyConversation,
+  listConversationMessages,
+  userSendMessage,
+  userMarkRead,
+  type ChatMessage,
+  type ChatSettings,
+} from "@/lib/live-chat.functions";
 
+// Backwards-compat exports (older settings consumer still references these)
 export type LiveChatWidgetSettings = {
   enabled: boolean;
-  whatsapp_number: string;
-  chat_message: string;
   position: "bottom-right" | "bottom-left";
-  heading: string;
-  subheading: string;
+  chat_message?: string;
+  heading?: string;
+  subheading?: string;
+  whatsapp_number?: string;
 };
-
 export const LIVE_CHAT_DEFAULTS: LiveChatWidgetSettings = {
-  enabled: false,
-  whatsapp_number: "",
-  chat_message: "Hi, I need help",
+  enabled: true,
   position: "bottom-right",
-  heading: "How can we help?",
-  subheading: "Chat with our team — we usually reply within minutes.",
 };
 
-function WhatsAppIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M16.001 2.667C8.638 2.667 2.667 8.638 2.667 16c0 2.353.616 4.652 1.787 6.677L2.667 29.333l6.86-1.764A13.27 13.27 0 0 0 16 29.333C23.363 29.333 29.333 23.363 29.333 16S23.363 2.667 16.001 2.667Zm6.123 16.03c-.335-.168-1.984-.978-2.291-1.09-.308-.112-.531-.168-.755.168-.224.335-.866 1.09-1.062 1.314-.196.224-.392.252-.726.084-.335-.168-1.414-.521-2.694-1.661-.996-.888-1.668-1.984-1.864-2.319-.196-.335-.021-.516.147-.683.151-.15.335-.392.503-.587.168-.196.224-.336.336-.56.112-.224.056-.42-.028-.587-.084-.168-.755-1.819-1.034-2.49-.272-.654-.55-.566-.755-.577l-.643-.012a1.24 1.24 0 0 0-.895.42c-.308.335-1.174 1.147-1.174 2.797 0 1.65 1.202 3.244 1.37 3.468.168.224 2.367 3.614 5.736 5.066.802.346 1.428.552 1.916.706.805.256 1.538.22 2.117.134.646-.096 1.984-.811 2.264-1.594.28-.783.28-1.455.196-1.594-.084-.14-.308-.224-.643-.392Z" />
-    </svg>
-  );
+const SOUND_KEY = "lc_sound_enabled";
+
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
-function buildWaHref(phone: string, message: string) {
-  const p = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
-  if (!p) return null;
-  const m = message.trim();
-  return m ? `https://wa.me/${p}?text=${encodeURIComponent(m)}` : `https://wa.me/${p}`;
+function playPing() {
+  try {
+    const enabled = localStorage.getItem(SOUND_KEY) !== "0";
+    if (!enabled) return;
+    // tiny WebAudio ping — avoids bundling audio file
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.value = 880;
+    o.connect(g);
+    g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+    o.start();
+    o.stop(ctx.currentTime + 0.26);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function LiveChatWidget() {
-  const settings = useSetting<LiveChatWidgetSettings>("live_chat_widget", LIVE_CHAT_DEFAULTS);
-  const location = useLocation();
+  const qc = useQueryClient();
+  const fetchSettings = useServerFn(getChatSettings);
+  const startConv = useServerFn(getOrCreateMyConversation);
+  const fetchMessages = useServerFn(listConversationMessages);
+  const sendMsg = useServerFn(userSendMessage);
+  const markRead = useServerFn(userMarkRead);
+
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [msg, setMsg] = useState("");
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [input, setInput] = useState("");
+  const [unread, setUnread] = useState(0);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(SOUND_KEY) !== "0";
+  });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Auth gate
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+    let alive = true;
+    supabase.auth.getUser().then(({ data }) => alive && setAuthed(!!data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setAuthed(!!s?.user);
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const settingsQ = useQuery({
+    queryKey: ["chat", "settings"],
+    queryFn: () => fetchSettings(),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
+  // Realtime: settings updates
+  useEffect(() => {
+    const ch = supabase
+      .channel("lc-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "live_chat_settings" },
+        () => qc.invalidateQueries({ queryKey: ["chat", "settings"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
+  const settings = (settingsQ.data ?? {
+    enabled: true,
+    position: "bottom-right",
+    theme_color: "#3b82f6",
+    welcome_message: "Hi! How can we help today?",
+    offline_message: "",
+    email_notifications: true,
+    sound_notifications: true,
+    auto_assignment_enabled: false,
+    attachment_max_mb: 10,
+    rate_limit_per_minute: 20,
+  }) as ChatSettings;
+
+  const convQ = useQuery({
+    queryKey: ["chat", "my-conversation"],
+    queryFn: () => startConv(),
+    enabled: !!authed && open,
+    staleTime: Infinity,
+  });
+  const conversationId = convQ.data?.id ?? null;
+
+  const messagesQ = useQuery({
+    queryKey: ["chat", "messages", conversationId],
+    queryFn: () => fetchMessages({ data: { conversation_id: conversationId! } }),
+    enabled: !!conversationId,
+    staleTime: 5_000,
+  });
+
+  // Realtime messages
+  useEffect(() => {
+    if (!conversationId) return;
+    const ch = supabase
+      .channel(`lc-conv-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "live_chat_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const msg = payload.new as ChatMessage;
+          qc.setQueryData<ChatMessage[]>(
+            ["chat", "messages", conversationId],
+            (prev = []) => (prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]),
+          );
+          if (msg.sender_type === "staff") {
+            if (!open) setUnread((u) => u + 1);
+            playPing();
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [conversationId, qc, open]);
+
+  // When opened: mark read + reset badge
+  useEffect(() => {
+    if (open && conversationId) {
+      setUnread(0);
+      markRead({ data: { conversation_id: conversationId } }).catch(() => undefined);
     }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, conversationId, markRead]);
 
+  // Scroll to bottom on new message
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messagesQ.data, open]);
+
+  // Background polling for unread when closed
+  useEffect(() => {
+    if (!authed || open) return;
+    const id = setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["chat", "my-conversation"] });
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [authed, open, qc]);
+
+  // Watch initial unread from conv
+  useEffect(() => {
+    if (convQ.data && !open) setUnread(convQ.data.unread_for_user ?? 0);
+  }, [convQ.data, open]);
+
+  const sendMutation = useMutation({
+    mutationFn: async (body: string) => {
+      if (!conversationId) throw new Error("No conversation");
+      return sendMsg({ data: { conversation_id: conversationId, body } });
+    },
+    onSuccess: (msg) => {
+      qc.setQueryData<ChatMessage[]>(
+        ["chat", "messages", conversationId],
+        (prev = []) => (prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]),
+      );
+    },
+  });
+
+  const handleSend = useCallback(() => {
+    const v = input.trim();
+    if (!v || sendMutation.isPending) return;
+    setInput("");
+    sendMutation.mutate(v);
+  }, [input, sendMutation]);
+
+  const toggleSound = () => {
+    setSoundOn((s) => {
+      const next = !s;
+      try {
+        localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const messages = messagesQ.data ?? [];
+  const positionClass = settings.position === "bottom-left" ? "left-4" : "right-4";
+  const themeStyle = useMemo(
+    () => ({ background: settings.theme_color || "#3b82f6" }),
+    [settings.theme_color],
+  );
+
+  // Hidden states
+  if (!authed) return null;
   if (!settings.enabled) return null;
-
-  // Hide on admin shell and site-preview iframe to avoid overlapping admin actions.
-  const path = location.pathname;
-  if (path === "/admin" || path.startsWith("/admin/")) return null;
-  if (
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("site-preview") === "1"
-  ) {
-    return null;
-  }
-
-  const waBase = buildWaHref(settings.whatsapp_number, settings.chat_message);
-  if (!waBase) return null;
-
-  const composed = [name.trim() ? `Hi, I'm ${name.trim()}.` : "", msg.trim()]
-    .filter(Boolean)
-    .join(" ");
-  const waSendHref =
-    buildWaHref(settings.whatsapp_number, composed || settings.chat_message) ?? waBase;
-
-  const pos =
-    settings.position === "bottom-left"
-      ? "left-4 sm:left-6 items-start"
-      : "right-4 sm:right-6 items-end";
 
   return (
     <div
-      className={`fixed bottom-4 z-[9999] flex flex-col gap-3 sm:bottom-6 ${pos}`}
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className={`fixed bottom-4 ${positionClass} z-50 flex flex-col items-end gap-3`}
+      data-testid="live-chat-widget"
     >
       {open && (
         <div
-          ref={panelRef}
+          className="flex h-[540px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
           role="dialog"
-          aria-modal="false"
-          aria-label="Live chat"
-          className="animate-in fade-in zoom-in-95 slide-in-from-bottom-4 w-[min(92vw,22rem)] overflow-hidden rounded-3xl border border-white/10 bg-background shadow-2xl duration-200"
+          aria-label="Live support chat"
         >
-          <div
-            className="relative px-5 pb-5 pt-6 text-white"
-            style={{
-              background:
-                "linear-gradient(135deg, #128C7E 0%, #25D366 60%, #25D366 100%)",
-            }}
-          >
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3 text-white" style={themeStyle}>
+            <div className="relative">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400" />
+            </div>
+            <div className="flex-1 leading-tight">
+              <p className="text-sm font-semibold">Support</p>
+              <p className="text-[11px] opacity-80">We typically reply within minutes</p>
+            </div>
             <button
-              type="button"
+              onClick={toggleSound}
+              className="rounded-md p-1 text-white/80 hover:bg-white/15 hover:text-white"
+              aria-label={soundOn ? "Mute notifications" : "Enable sound"}
+              title={soundOn ? "Sound on" : "Sound off"}
+            >
+              <span className="text-xs">{soundOn ? "🔔" : "🔕"}</span>
+            </button>
+            <button
               onClick={() => setOpen(false)}
+              className="rounded-md p-1 text-white/80 hover:bg-white/15 hover:text-white"
               aria-label="Close chat"
-              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-white/15">
-                <WhatsAppIcon className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold leading-tight">{settings.heading}</h3>
-                <p className="text-xs text-white/85">{settings.subheading}</p>
-              </div>
-            </div>
           </div>
-          <div className="space-y-3 p-4">
-            <a
-              href={waBase}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-300"
-            >
-              <WhatsAppIcon className="h-5 w-5" />
-              Open WhatsApp Chat
-            </a>
 
-            <div className="rounded-2xl border border-border bg-background/50 p-3">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Contact us
+          {/* Body */}
+          <div
+            ref={scrollRef}
+            className="flex-1 space-y-3 overflow-y-auto bg-muted/30 px-4 py-4"
+          >
+            {/* Welcome bubble */}
+            <div className="flex gap-2">
+              <div className="rounded-2xl rounded-bl-sm bg-card px-3 py-2 text-sm shadow-sm">
+                {settings.welcome_message}
               </div>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 80))}
-                placeholder="Your name (optional)"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/40"
-              />
-              <textarea
-                value={msg}
-                onChange={(e) => setMsg(e.target.value.slice(0, 600))}
-                rows={3}
-                placeholder="How can we help?"
-                className="mt-2 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/40"
-              />
-              <a
-                href={waSendHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  if (!msg.trim()) return;
-                  setTimeout(() => {
-                    setMsg("");
-                    setOpen(false);
-                  }, 150);
-                }}
-                aria-disabled={!msg.trim()}
-                className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white transition ${
-                  msg.trim()
-                    ? "hover:brightness-110"
-                    : "pointer-events-none opacity-50"
-                }`}
-                style={{ background: "#25D366" }}
-              >
-                <Send className="h-4 w-4" /> Send via WhatsApp
-              </a>
             </div>
-            <p className="text-center text-[10px] text-muted-foreground">
-              We&apos;ll never share your details.
-            </p>
+
+            {messagesQ.isLoading && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {messages.map((m) => {
+              const isUser = m.sender_type === "user";
+              return (
+                <div
+                  key={m.id}
+                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                      isUser
+                        ? "rounded-br-sm text-white"
+                        : "rounded-bl-sm bg-card text-foreground"
+                    }`}
+                    style={isUser ? themeStyle : undefined}
+                  >
+                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                    <p
+                      className={`mt-1 text-[10px] ${isUser ? "text-white/70" : "text-muted-foreground"}`}
+                    >
+                      {timeAgo(m.created_at)}
+                      {isUser && m.read_at ? " · Seen" : ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Composer */}
+          <div className="border-t border-border bg-card px-3 py-2">
+            <div className="flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Type a message…"
+                rows={1}
+                className="max-h-32 flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || sendMutation.isPending}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow disabled:opacity-50"
+                style={themeStyle}
+                aria-label="Send"
+              >
+                {sendMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            {sendMutation.error && (
+              <p className="mt-1 text-[11px] text-destructive">
+                {(sendMutation.error as Error).message}
+              </p>
+            )}
           </div>
         </div>
       )}
 
       <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Close chat widget" : "Open chat widget"}
-        aria-expanded={open}
-        className="group relative grid h-14 w-14 place-items-center self-end rounded-full text-white shadow-[0_10px_28px_rgba(37,211,102,0.5)] ring-1 ring-black/5 transition-transform duration-150 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
-        style={{ backgroundColor: open ? "#0f172a" : "#25D366" }}
+        onClick={() => setOpen((o) => !o)}
+        className="relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition-transform hover:scale-105"
+        style={themeStyle}
+        aria-label={open ? "Close chat" : "Open chat"}
       >
-        {!open && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-full"
-            style={{
-              boxShadow: "0 0 0 0 rgba(37,211,102,0.55)",
-              animation: "lcw-pulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
-            }}
-          />
-        )}
-        {open ? (
-          <X className="relative h-6 w-6" />
-        ) : (
-          <MessageCircle className="relative h-7 w-7" />
+        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {!open && unread > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white shadow ring-2 ring-background">
+            {unread > 9 ? "9+" : unread}
+          </span>
         )}
       </button>
-      <style>{`@keyframes lcw-pulse{0%{box-shadow:0 0 0 0 rgba(37,211,102,0.55)}70%{box-shadow:0 0 0 14px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}}`}</style>
     </div>
   );
 }
