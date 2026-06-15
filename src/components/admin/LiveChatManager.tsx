@@ -181,9 +181,15 @@ export function LiveChatManager() {
     onError: (e) => toast.error((e as Error).message),
   });
 
+  type UpdatePatch = {
+    conversation_id: string;
+    status?: ChatStatus;
+    priority?: "low" | "normal" | "high" | "urgent";
+    assigned_to?: string | null;
+    is_blocked?: boolean;
+  };
   const updateMut = useMutation({
-    mutationFn: async (patch: Parameters<typeof adminUpdateConversation>[0]["data"]) =>
-      updateFn({ data: patch }),
+    mutationFn: async (patch: UpdatePatch) => updateFn({ data: patch }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "chat", "list"] });
       qc.invalidateQueries({ queryKey: ["admin", "chat", "detail", selectedId] });
