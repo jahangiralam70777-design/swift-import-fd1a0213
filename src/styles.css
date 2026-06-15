@@ -136,6 +136,19 @@
   from { stroke-dashoffset: 339; }
   to { stroke-dashoffset: 75; }
 }
+@keyframes notice-ticker-rtl {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.notice-ticker {
+  animation-name: notice-ticker-rtl;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-ticker { animation: none; transform: none; }
+}
 
 @layer base {
   * { border-color: var(--color-border); }

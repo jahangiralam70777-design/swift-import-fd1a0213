@@ -44,6 +44,7 @@ import { useSetting } from "@/hooks/use-site-content";
 import { usePrefs, setPrefs, DEFAULT_PREFS } from "@/lib/profile-prefs";
 import { WhatsAppPopupSettingsPanel } from "@/components/admin/WhatsAppPopupSettings";
 import { LiveChatWidgetSettingsPanel } from "@/components/admin/LiveChatWidgetSettings";
+import { NoticeBannerSettingsPanel } from "@/components/admin/NoticeBannerSettings";
 import { AuthControlsSection } from "@/components/admin/AuthControlsSection";
 
 /* ============================================================
@@ -706,6 +707,7 @@ export function AdminSettingsFlow() {
       <ProfilePanel />
       <SecurityPanel />
       <AuthControlsSection />
+      <NoticeBannerSettingsPanel />
       <AppearancePanel />
       <NotificationPrefsPanel />
       <ModulesPanel />

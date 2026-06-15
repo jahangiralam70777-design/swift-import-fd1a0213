@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { DashSidebar } from "@/components/dashboard/DashSidebar";
 import { DashTopbar } from "@/components/dashboard/DashTopbar";
 import { StudyHeartbeat } from "@/components/tracking/StudyHeartbeat";
+import { NoticeBanner } from "@/components/site/NoticeBanner";
 import { useAppStore, hasLocalAuthSession } from "@/stores/app-store";
 
 export const Route = createFileRoute("/_student")({
@@ -62,6 +63,7 @@ function StudentLayout() {
           <DashSidebar />
           <div className="pointer-events-auto min-w-0 flex-1 space-y-4">
             <DashTopbar />
+            <NoticeBanner />
             <StudyHeartbeat />
             <Outlet />
           </div>
