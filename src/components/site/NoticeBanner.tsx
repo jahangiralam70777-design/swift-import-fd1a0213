@@ -36,28 +36,28 @@ export const NOTICE_BANNER_DEFAULTS: NoticeBannerValue = {
 
 const TYPE_STYLES: Record<NoticeType, { bar: string; chip: string; icon: React.ComponentType<{ className?: string }> }> = {
   info: {
-    bar: "border-sky-400/30 bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent text-sky-50 dark:text-sky-100",
-    chip: "bg-sky-500/20 text-sky-100 border-sky-400/40",
+    bar: "border-sky-500/40 bg-sky-50 text-sky-950 dark:bg-sky-950/50 dark:text-sky-50",
+    chip: "bg-sky-500/15 text-sky-900 border-sky-500/40 dark:bg-sky-400/20 dark:text-sky-100",
     icon: Info,
   },
   success: {
-    bar: "border-emerald-400/30 bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent text-emerald-50",
-    chip: "bg-emerald-500/20 text-emerald-100 border-emerald-400/40",
+    bar: "border-emerald-500/40 bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-50",
+    chip: "bg-emerald-500/15 text-emerald-900 border-emerald-500/40 dark:bg-emerald-400/20 dark:text-emerald-100",
     icon: CheckCircle2,
   },
   warning: {
-    bar: "border-amber-400/40 bg-gradient-to-r from-amber-500/20 via-amber-500/5 to-transparent text-amber-50",
-    chip: "bg-amber-500/25 text-amber-100 border-amber-400/40",
+    bar: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950/50 dark:text-amber-50",
+    chip: "bg-amber-500/20 text-amber-900 border-amber-500/50 dark:bg-amber-400/25 dark:text-amber-100",
     icon: AlertTriangle,
   },
   important: {
-    bar: "border-rose-400/40 bg-gradient-to-r from-rose-500/20 via-rose-500/5 to-transparent text-rose-50",
-    chip: "bg-rose-500/25 text-rose-100 border-rose-400/40",
+    bar: "border-rose-500/50 bg-rose-50 text-rose-950 dark:bg-rose-950/50 dark:text-rose-50",
+    chip: "bg-rose-500/20 text-rose-900 border-rose-500/50 dark:bg-rose-400/25 dark:text-rose-100",
     icon: Megaphone,
   },
   custom: {
-    bar: "border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 via-violet-500/10 to-transparent text-fuchsia-50",
-    chip: "bg-fuchsia-500/20 text-fuchsia-100 border-fuchsia-400/40",
+    bar: "border-fuchsia-500/40 bg-fuchsia-50 text-fuchsia-950 dark:bg-fuchsia-950/50 dark:text-fuchsia-50",
+    chip: "bg-fuchsia-500/15 text-fuchsia-900 border-fuchsia-500/40 dark:bg-fuchsia-400/20 dark:text-fuchsia-100",
     icon: Sparkles,
   },
 };
@@ -152,10 +152,10 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
         {isTicker ? (
           <div
             className="relative min-w-0 flex-1 overflow-hidden"
-            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
+            style={{ maskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)" }}
           >
             <div
-              className={`notice-ticker flex w-max items-center gap-16 whitespace-nowrap text-sm font-medium ${
+              className={`notice-ticker flex w-max whitespace-nowrap text-sm font-medium ${
                 value.pauseOnHover ? "hover:[animation-play-state:paused]" : ""
               }`}
               style={{
@@ -163,9 +163,9 @@ function NoticeBannerView({ value }: { value: NoticeBannerValue }) {
                 animationIterationCount: value.loop ? "infinite" : 1,
               }}
             >
-              {/* Duplicate the content twice so the loop is seamless */}
-              <span className="px-2">{content}</span>
-              <span aria-hidden className="px-2">{content}</span>
+              {/* Two identical halves; translateX(-50%) yields a seamless loop */}
+              <span className="pr-16">{content}</span>
+              <span aria-hidden className="pr-16">{content}</span>
             </div>
           </div>
         ) : (
