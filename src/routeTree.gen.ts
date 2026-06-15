@@ -61,6 +61,7 @@ import { Route as StudentClassesRouteImport } from './routes/_student.classes'
 import { Route as StudentBookmarksRouteImport } from './routes/_student.bookmarks'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin.users.index'
 import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as ApiPublicChatCleanupRouteImport } from './routes/api/public/chat-cleanup'
 import { Route as AdminUsersListRouteImport } from './routes/admin.users.list'
 import { Route as AdminUsersAnalyticsRouteImport } from './routes/admin.users.analytics'
 
@@ -323,6 +324,11 @@ const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
   path: '/api/public/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicChatCleanupRoute = ApiPublicChatCleanupRouteImport.update({
+  id: '/api/public/chat-cleanup',
+  path: '/api/public/chat-cleanup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersListRoute = AdminUsersListRouteImport.update({
   id: '/list',
   path: '/list',
@@ -386,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/users/analytics': typeof AdminUsersAnalyticsRoute
   '/admin/users/list': typeof AdminUsersListRoute
+  '/api/public/chat-cleanup': typeof ApiPublicChatCleanupRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
@@ -439,6 +446,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/users/analytics': typeof AdminUsersAnalyticsRoute
   '/admin/users/list': typeof AdminUsersListRoute
+  '/api/public/chat-cleanup': typeof ApiPublicChatCleanupRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/users': typeof AdminUsersIndexRoute
 }
@@ -496,6 +504,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/admin/users/analytics': typeof AdminUsersAnalyticsRoute
   '/admin/users/list': typeof AdminUsersListRoute
+  '/api/public/chat-cleanup': typeof ApiPublicChatCleanupRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
@@ -553,6 +562,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/users/analytics'
     | '/admin/users/list'
+    | '/api/public/chat-cleanup'
     | '/api/public/health'
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -606,6 +616,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/users/analytics'
     | '/admin/users/list'
+    | '/api/public/chat-cleanup'
     | '/api/public/health'
     | '/admin/users'
   id:
@@ -662,6 +673,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/users/analytics'
     | '/admin/users/list'
+    | '/api/public/chat-cleanup'
     | '/api/public/health'
     | '/admin/users/'
   fileRoutesById: FileRoutesById
@@ -682,6 +694,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  ApiPublicChatCleanupRoute: typeof ApiPublicChatCleanupRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
 }
 
@@ -1051,6 +1064,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/chat-cleanup': {
+      id: '/api/public/chat-cleanup'
+      path: '/api/public/chat-cleanup'
+      fullPath: '/api/public/chat-cleanup'
+      preLoaderRoute: typeof ApiPublicChatCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users/list': {
       id: '/admin/users/list'
       path: '/list'
@@ -1195,6 +1215,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  ApiPublicChatCleanupRoute: ApiPublicChatCleanupRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
 }
 export const routeTree = rootRouteImport
