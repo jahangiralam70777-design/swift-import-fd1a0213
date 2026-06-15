@@ -1,6 +1,7 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import {
   listModuleVisibility,
   type ModuleKey,
@@ -31,13 +32,45 @@ export const MODULE_BY_FEATURE_TITLE: Record<string, ModuleKey> = {
   "Video Classes": "classes",
 };
 
+const VISIBILITY_TABLES = [
+  "module_visibility",
+  "flash_card_visibility",
+  "short_notes_visibility",
+  "question_bank_visibility",
+  "video_class_visibility",
+] as const;
+
 export function useModuleVisibility() {
   const listFn = useServerFn(listModuleVisibility);
+  const qc = useQueryClient();
   const query = useQuery({
     queryKey: ["module-visibility"],
     queryFn: () => listFn(),
-    staleTime: 15_000,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
   });
+
+  // Dedicated realtime subscription so feature visibility changes propagate
+  // to every connected session instantly, without depending on the global
+  // invalidator (which is gated on auth).
+  useEffect(() => {
+    const channel = supabase.channel(
+      `module-visibility-${Math.random().toString(36).slice(2, 8)}`,
+    );
+    for (const table of VISIBILITY_TABLES) {
+      channel.on(
+        "postgres_changes" as never,
+        { event: "*", schema: "public", table },
+        () => {
+          qc.invalidateQueries({ queryKey: ["module-visibility"] });
+        },
+      );
+    }
+    channel.subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const hiddenSet = useMemo(() => {
     const s = new Set<ModuleKey>();
