@@ -38,6 +38,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin.notificat
 import { Route as AdminMockTestRouteImport } from './routes/admin.mock-test'
 import { Route as AdminMcqRouteImport } from './routes/admin.mcq'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminLiveChatRouteImport } from './routes/admin.live-chat'
 import { Route as AdminFlashCardsRouteImport } from './routes/admin.flash-cards'
 import { Route as AdminDatabaseRouteImport } from './routes/admin.database'
 import { Route as AdminClassesRouteImport } from './routes/admin.classes'
@@ -207,6 +208,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLiveChatRoute = AdminLiveChatRouteImport.update({
+  id: '/live-chat',
+  path: '/live-chat',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFlashCardsRoute = AdminFlashCardsRouteImport.update({
   id: '/flash-cards',
   path: '/flash-cards',
@@ -363,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/admin/classes': typeof AdminClassesRoute
   '/admin/database': typeof AdminDatabaseRoute
   '/admin/flash-cards': typeof AdminFlashCardsRoute
+  '/admin/live-chat': typeof AdminLiveChatRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/mcq': typeof AdminMcqRoute
   '/admin/mock-test': typeof AdminMockTestRoute
@@ -416,6 +423,7 @@ export interface FileRoutesByTo {
   '/admin/classes': typeof AdminClassesRoute
   '/admin/database': typeof AdminDatabaseRoute
   '/admin/flash-cards': typeof AdminFlashCardsRoute
+  '/admin/live-chat': typeof AdminLiveChatRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/mcq': typeof AdminMcqRoute
   '/admin/mock-test': typeof AdminMockTestRoute
@@ -471,6 +479,7 @@ export interface FileRoutesById {
   '/admin/classes': typeof AdminClassesRoute
   '/admin/database': typeof AdminDatabaseRoute
   '/admin/flash-cards': typeof AdminFlashCardsRoute
+  '/admin/live-chat': typeof AdminLiveChatRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/mcq': typeof AdminMcqRoute
   '/admin/mock-test': typeof AdminMockTestRoute
@@ -527,6 +536,7 @@ export interface FileRouteTypes {
     | '/admin/classes'
     | '/admin/database'
     | '/admin/flash-cards'
+    | '/admin/live-chat'
     | '/admin/login'
     | '/admin/mcq'
     | '/admin/mock-test'
@@ -580,6 +590,7 @@ export interface FileRouteTypes {
     | '/admin/classes'
     | '/admin/database'
     | '/admin/flash-cards'
+    | '/admin/live-chat'
     | '/admin/login'
     | '/admin/mcq'
     | '/admin/mock-test'
@@ -634,6 +645,7 @@ export interface FileRouteTypes {
     | '/admin/classes'
     | '/admin/database'
     | '/admin/flash-cards'
+    | '/admin/live-chat'
     | '/admin/login'
     | '/admin/mcq'
     | '/admin/mock-test'
@@ -878,6 +890,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/live-chat': {
+      id: '/admin/live-chat'
+      path: '/live-chat'
+      fullPath: '/admin/live-chat'
+      preLoaderRoute: typeof AdminLiveChatRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/flash-cards': {
       id: '/admin/flash-cards'
       path: '/flash-cards'
@@ -1109,6 +1128,7 @@ interface AdminRouteChildren {
   AdminClassesRoute: typeof AdminClassesRoute
   AdminDatabaseRoute: typeof AdminDatabaseRoute
   AdminFlashCardsRoute: typeof AdminFlashCardsRoute
+  AdminLiveChatRoute: typeof AdminLiveChatRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminMcqRoute: typeof AdminMcqRoute
   AdminMockTestRoute: typeof AdminMockTestRoute
@@ -1131,6 +1151,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClassesRoute: AdminClassesRoute,
   AdminDatabaseRoute: AdminDatabaseRoute,
   AdminFlashCardsRoute: AdminFlashCardsRoute,
+  AdminLiveChatRoute: AdminLiveChatRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminMcqRoute: AdminMcqRoute,
   AdminMockTestRoute: AdminMockTestRoute,
