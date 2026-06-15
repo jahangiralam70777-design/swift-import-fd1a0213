@@ -120,17 +120,28 @@ function isWithinSchedule(v: NoticeBannerValue, now = Date.now()): boolean {
 function useNoticeBannerRealtime() {
   const qc = useQueryClient();
   useEffect(() => {
+    const invalidate = () => qc.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
+
+    // 1) Supabase postgres_changes — fires when the row mutates in DB.
     const channel = supabase.channel(`notice-banner-${Math.random().toString(36).slice(2, 8)}`);
     channel.on(
       "postgres_changes" as never,
       { event: "*", schema: "public", table: "site_settings" },
-      () => {
-        qc.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
-      },
+      invalidate,
     );
     channel.subscribe();
+
+    // 2) Same-browser BroadcastChannel — covers the admin->student preview
+    //    case and works even if the realtime publication isn't enabled yet.
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      bc = new BroadcastChannel("site-settings-sync");
+      bc.onmessage = invalidate;
+    }
+
     return () => {
       supabase.removeChannel(channel);
+      bc?.close();
     };
   }, [qc]);
 }
